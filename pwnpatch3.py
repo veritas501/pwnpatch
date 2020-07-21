@@ -13,7 +13,6 @@ arch_enum={'i386':1,'amd64':2}
 
 class Memory(object):
     def __init__(self,fileobj):
-        print(type(fileobj))
         if isinstance(fileobj,str):
             self.mem = open(fileobj,'rb').read()
         elif isinstance(fileobj,file_types):
