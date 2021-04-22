@@ -114,5 +114,5 @@ class Log:
         return use_style(s, 'underline')
 
 
-logging.basicConfig(level=logging.INFO, format="%(message)s")
+logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stdout)
 log = Log()
