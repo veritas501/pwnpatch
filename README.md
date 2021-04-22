@@ -1,8 +1,12 @@
 # pwnpatch
-xjb写的一个小patch工具
+
+用于ctf pwn的patch玩具轮子。
 
 
+- 安装：
+```
+python3 setup.py install
+```
 
-主要的功能还是patch和hook，可以使用c代码，可以调用库函数但是有点限制。
-
-test里有一些例子。
+- quickstart：
+参考examples和tests
