@@ -1,14 +1,10 @@
-from pwn import *
-from pwnpatch import *
+from pwnpatch import patcher
 
-patcher = Patch('./t_fmt_64')
-bin = ELF('./t_fmt_64',checksec=False)
-
+pt = patcher('./t_fmt_64')
+pt.add_byte('%s\x00','new_fmt_str')
 asmcode='''
 mov rsi,rdi
-mov rdi, 0x0000000000400735
+mov rdi, {new_fmt_str}
 '''
-
-patcher.patch(0x0000000000400735,byte='%s\x00')
-patcher.hook(0x0000000000400681,asm=asmcode)
-patcher.save()
+pt.hook_asm(0x400681, asmcode)
+pt.save()
