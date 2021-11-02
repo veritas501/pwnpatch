@@ -138,7 +138,7 @@ class PatcherCommon:
         # 检查是否有对应的vaddr
         try:
             start_faddr = self._va_to_offset(vaddr)
-            end_faddr = self._va_to_offset(vaddr + len(byte))
+            end_faddr = self._va_to_offset(vaddr + len(byte) - 1)
         except lief.exception:
             # patch too long
             raise PatchException("Patch {} bytes @ {} is too long".format(hex(len(byte)), hex(vaddr)))
