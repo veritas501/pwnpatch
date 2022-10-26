@@ -220,8 +220,8 @@ class PatcherELF(PatcherCommon):
         cs_disasm = self.ldr.cs.disasm(disasm_data, vaddr)
         origin1_jmp_addr = vaddr
         tmp_len = 0
-        for disasm in cs_disasm:
-            if tmp_len < x86_jmp_inst_length:
+        for i, disasm in enumerate(cs_disasm):
+            if i == 0 or tmp_len < x86_jmp_inst_length:
                 tmp_len += len(disasm.bytes)
         origin1_jmp_length = tmp_len
         origin2_jmp_addr = vaddr + origin1_jmp_length
@@ -317,7 +317,7 @@ class PatcherELF(PatcherCommon):
         origin1_jmp, inst_cnt = self._asm("jmp {{detour1_{}}}".format(hex(vaddr)), origin1_jmp_addr)
         origin2_jmp, inst_cnt = self._asm("jmp {{detour2_{}}}".format(hex(vaddr)), origin2_jmp_addr)
         backup1_bytes = bytearray(self.ldr.binary.get_content_from_virtual_address(vaddr, backup_length))
-        backup1_bytes[:origin1_jmp_length] = origin1_jmp
+        backup1_bytes[:len(origin1_jmp)] = origin1_jmp
         backup2_bytes = bytearray(self.ldr.binary.get_content_from_virtual_address(vaddr, backup_length))
         backup2_bytes[origin1_jmp_length:] = origin2_jmp
         self._patch_byte(backup1, backup1_bytes)
