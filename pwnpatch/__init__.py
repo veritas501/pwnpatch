@@ -1,3 +1,1 @@
-#!/usr/bin/env python3
-
-from pwnpatch.pwnpatch import patcher
+from pwnpatch.main import get_patcher

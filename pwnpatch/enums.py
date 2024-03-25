@@ -1,6 +1,3 @@
-"""
-用于存放用到的enums
-"""
 from enum import Enum
 
 
@@ -19,7 +16,24 @@ class Arch(Enum):
     MIPS = 5
 
 
+class BitSize(Enum):
+    NONE = 0
+    X32 = 32
+    X64 = 64
+
+
 class EXE(Enum):
     NONE = 0
     ELF = 1
     PE = 2
+
+
+class SegProt(Enum):
+    NONE = 0
+    X = 1
+    W = 2
+    R = 4
+    RWX = 7
+    RX = 5
+    RW = 6
+    WX = 3

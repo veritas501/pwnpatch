@@ -1,9 +1,5 @@
-"""
-log util类
-"""
-
-import sys
 import logging
+import sys
 
 __all__ = [
     'Log', 'log', 'use_style'
@@ -49,7 +45,8 @@ STYLE = {
 
 def use_style(string, mode='', fore='', back=''):
     if sys.stdout.isatty():
-        style_list = [STYLE['mode'].get(mode), STYLE['fore'].get(fore), STYLE['back'].get(back)]
+        style_list = [STYLE['mode'].get(mode), STYLE['fore'].get(fore),
+                      STYLE['back'].get(back)]
         style_list = list(filter(lambda x: x is not None, style_list))
         if not style_list:
             style_list = [0]

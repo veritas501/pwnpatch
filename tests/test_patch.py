@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-from pwnpatch import patcher
 import subprocess as sp
+
+from pwnpatch import get_patcher
+from pwnpatch.patcher import PePatcher
 
 
 def test_64_pie():
-    p = patcher("./example_64_pie")
+    p = get_patcher("./sample/example_64_pie")
     # func1 use patch
     asm = '''
     mov rax,1
@@ -23,12 +25,6 @@ def test_64_pie():
     p.add_segment()
     p.add_segment(prot=5)
     p.add_segment()
-    c_code = '''
-    int main(){
-        return getpid();
-    }
-    '''
-    p.add_c(c_code)
     p.save("patch_result")
     io = sp.Popen("./patch_result")
     io.communicate()
@@ -36,7 +32,7 @@ def test_64_pie():
 
 
 def test_64_nopie():
-    p = patcher("./example_64_nopie")
+    p = get_patcher("./sample/example_64_nopie")
     # func1 use patch
     asm = '''
     mov rax,1
@@ -55,12 +51,6 @@ def test_64_nopie():
     p.add_segment()
     p.add_segment(prot=5)
     p.add_segment()
-    c_code = '''
-    int main(){
-        return getpid();
-    }
-    '''
-    p.add_c(c_code)
     p.save("patch_result")
     io = sp.Popen("./patch_result")
     io.communicate()
@@ -68,7 +58,7 @@ def test_64_nopie():
 
 
 def test_32_pie():
-    p = patcher("./example_32_pie")
+    p = get_patcher("./sample/example_32_pie")
     # func1 use patch
     asm = '''
     mov eax,1
@@ -95,12 +85,6 @@ def test_32_pie():
     p.add_segment()
     p.add_segment(prot=5)
     p.add_segment()
-    c_code = '''
-    int main(){
-        return getpid();
-    }
-    '''
-    p.add_c(c_code)
     p.save("patch_result")
     io = sp.Popen("./patch_result")
     io.communicate()
@@ -108,7 +92,7 @@ def test_32_pie():
 
 
 def test_32_nopie():
-    p = patcher("./example_32_nopie")
+    p = get_patcher("./sample/example_32_nopie")
     # func1 use patch
     asm = '''
     mov eax,1
@@ -135,12 +119,6 @@ def test_32_nopie():
     p.add_segment()
     p.add_segment(prot=5)
     p.add_segment()
-    c_code = '''
-    int main(){
-        return getpid();
-    }
-    '''
-    p.add_c(c_code)
     p.save("patch_result")
     io = sp.Popen("./patch_result")
     io.communicate()
@@ -148,7 +126,7 @@ def test_32_nopie():
 
 
 def test_64_static():
-    p = patcher("./example_64_static")
+    p = get_patcher("./sample/example_64_static")
     # func1 use patch
     asm = '''
     mov rax,1
@@ -167,12 +145,6 @@ def test_64_static():
     p.add_segment()
     p.add_segment(prot=5)
     p.add_segment()
-    c_code = '''
-    int main(){
-        return getpid();
-    }
-    '''
-    p.add_c(c_code)
     p.save("patch_result")
     io = sp.Popen("./patch_result")
     io.communicate()
@@ -180,7 +152,7 @@ def test_64_static():
 
 
 def test_aarch64_static():
-    p = patcher("./example_aarch64_static")
+    p = get_patcher("./sample/example_aarch64_static")
     # func1 use patch
     asm = '''
     mov x0,1
@@ -188,24 +160,19 @@ def test_aarch64_static():
     '''
     p.patch_asm(0x4006AC, asm)
     # TODO: aarch64 not support hook
-    # func2 use <s>hook</s> patch
+    # func2 use hook patch
     asm = '''
     CSET            W0, NE
     '''
     p.patch_asm(0x4006F0, asm)
     # func3 use add
     str2_p = p.add_byte("this_is_str2\x00", "str2")
-    p.patch_asm(0x400740, f"adrp x0, {str2_p & ~0xfff}; add x0, x0, {str2_p & 0xfff}")
+    p.patch_asm(0x400740,
+                f"adrp x0, {str2_p & ~0xfff}; add x0, x0, {str2_p & 0xfff}")
     # test add_segment
     p.add_segment()
     p.add_segment(prot=5)
     p.add_segment()
-    c_code = '''
-    int main(){
-        return getpid();
-    }
-    '''
-    p.add_c(c_code)
     p.save("patch_result")
     io = sp.Popen(["qemu-aarch64-static", "./patch_result"])
     io.communicate()
@@ -213,38 +180,36 @@ def test_aarch64_static():
 
 
 def test_mingw64():
-    p = patcher("./example_mingw64.exe")
+    p: PePatcher = get_patcher("./sample/example_mingw64.exe")
     # func1 use patch
     asm = '''
         mov rax,1
         ret
         '''
     p.patch_asm(0x401560, asm)
-    # TODO: pe not support hook
-    # func2 use <s>hook</s> patch
+    # func2 use hook< patch
     asm = '''
-        setnz al
+        mov rax,1
         '''
-    p.patch_asm(0x401590, asm)
+    p.hook_asm(0x401593, asm)
     # func3 use add
     str2_p = p.add_byte("this_is_str2\x00", "str2")
     p.patch_asm(0x4015C4, "lea rcx, [{str2}]")
     # test add_segment
-    # TODO: pe not support add_segment
-    # p.add_segment()
-    # p.add_segment(prot=5)
-    # p.add_segment()
-    c_code = '''
-        int main(){
-            return 0x1337;
-        }
-        '''
-    p.add_c(c_code)
-    p.save("patch_result")
-    io = sp.Popen("./patch_result")
+    p.add_segment()
+    p.add_segment(prot=5)
+    p.add_segment()
+    p.save("patch_result.exe")
+    io = sp.Popen("./patch_result.exe")
     io.communicate()
     assert io.returncode == 0
 
 
 if __name__ == '__main__':
+    test_64_pie()
+    test_64_nopie()
+    test_32_pie()
+    test_32_nopie()
+    test_64_static()
+    test_aarch64_static()
     test_mingw64()

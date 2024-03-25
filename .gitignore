@@ -1,11 +1,4 @@
-# ida
-*.id0
-*.id1
-*.id2
-*.nam
-*.til
-
-# pycharm
+# idea
 .idea
 
 # Byte-compiled / optimized / DLL files
@@ -13,6 +6,8 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# C extensions
+*.so
 
 # Distribution / packaging
 .Python

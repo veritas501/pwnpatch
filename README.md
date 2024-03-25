@@ -2,16 +2,12 @@
 
 用于ctf pwn的patch玩具轮子。
 
-
-
-
-- 安装：
-
+## Install
 
 ```
-python3 setup.py install
+python3 -m pip install .
 ```
 
-- quickstart：
+## Quick Start
 
-参考examples和tests
+参考examples和tests。
