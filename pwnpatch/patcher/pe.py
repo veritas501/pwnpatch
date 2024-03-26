@@ -214,8 +214,8 @@ class PePatcher(BasePatcher):
             ret.append(sec.src_buf)
             ret.append(sec.dst_padding)
 
-        self.binary_data = b''.join(ret)
-        self._reload()
+        self._pefile = pefile.PE(data=b''.join(ret),
+                                 fast_load=self.fast_load)
         self._fix_image_size()
         self._pefile.NT_HEADERS.OPTIONAL_HEADER.SizeOfHeaders = new_max_header_addr
         self._reload(self.fast_load)
