@@ -1,8 +1,8 @@
 from typing import Union
 
 from pwnpatch import enums
-from pwnpatch.exceptions import *
-from pwnpatch.patcher import *
+from pwnpatch import exceptions
+from pwnpatch import patcher
 
 
 class PatcherFactory:
@@ -24,13 +24,15 @@ class PatcherFactory:
             return enums.EXE.PE
         elif cls.is_elf(filename):
             return enums.EXE.ELF
-        raise UnsupportedBinaryException("Not a PE or ELF file")
+        raise exceptions.UnsupportedBinaryException("Not a PE or ELF file")
 
     @classmethod
-    def get_patcher(cls, filename: str) -> Union[ElfPatcher, PePatcher]:
+    def get_patcher(
+        cls, filename: str, minimal_edit: bool
+    ) -> Union[patcher.ElfPatcher, patcher.PePatcher]:
         exe_type = cls.get_binary_type(filename)
         if exe_type == enums.EXE.PE:
-            return PePatcher(filename)
+            return patcher.PePatcher(filename, minimal_edit=minimal_edit)
         elif exe_type == enums.EXE.ELF:
-            return ElfPatcher(filename)
-        raise UnsupportedBinaryException("unknown exe type")
+            return patcher.ElfPatcher(filename, minimal_edit=minimal_edit)
+        raise exceptions.UnsupportedBinaryException("unknown exe type")

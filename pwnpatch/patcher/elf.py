@@ -1,52 +1,55 @@
 import io
-from typing import Optional
+from typing import Optional, Union
 
 from elftools.elf import constants
 from elftools.elf.elffile import ELFFile
 from elftools.elf.sections import Section
 from elftools.elf.segments import Segment
 
-from pwnpatch.enums import *
-from pwnpatch.exceptions import *
+from pwnpatch import enums
+from pwnpatch import exceptions
 from pwnpatch.log_utils import log
 from pwnpatch.patcher.base import BasePatcher
 
 
 class ElfPatcher(BasePatcher):
-    def __init__(self, filename: str) -> None:
-        self._elffile_stream = open(filename, 'rb')
+    def __init__(self, filename: str, minimal_edit=False) -> None:
+        self._elffile_stream = open(filename, "rb")
         self._elffile: ELFFile = ELFFile(self._elffile_stream)
 
         # internal variables
         self._phdr_reallocated: bool = False
 
         super().__init__(filename)
-        self._init_code_cave()
+        if not minimal_edit:
+            self._init_code_cave()
 
     def _init_basic_info(self) -> bool:
         # 初始化基础信息
-        self.exe_type = EXE.ELF
+        self.exe_type = enums.EXE.ELF
         e_machine = self._elffile.header.e_machine
         self.arch = {
-            'EM_386': Arch.I386,
-            'EM_X86_64': Arch.AMD64,
-            'EM_ARM': Arch.ARM,
-            'EM_AARCH64': Arch.ARM64,
-            'EM_MIPS': Arch.MIPS,
-        }.get(e_machine, Arch.NONE)
-        if self.arch == Arch.NONE:
-            raise UnsupportedBinaryException(
-                "Unsupported arch: {}".format(e_machine))
+            "EM_386": enums.Arch.I386,
+            "EM_X86_64": enums.Arch.AMD64,
+            "EM_ARM": enums.Arch.ARM,
+            "EM_AARCH64": enums.Arch.ARM64,
+            "EM_MIPS": enums.Arch.MIPS,
+        }.get(e_machine, enums.Arch.NONE)
+        if self.arch == enums.Arch.NONE:
+            raise exceptions.UnsupportedBinaryException(
+                "Unsupported arch: {}".format(e_machine)
+            )
         is_little_endian = self._elffile.little_endian
-        self.endian = Endian.LSB if is_little_endian else Endian.MSB
-        bit_size = self._elffile.header.e_ident['EI_CLASS']
+        self.endian = enums.Endian.LSB if is_little_endian else enums.Endian.MSB
+        bit_size = self._elffile.header.e_ident["EI_CLASS"]
         self.bit_size = {
-            'ELFCLASS32': BitSize.X32,
-            'ELFCLASS64': BitSize.X64,
-        }.get(bit_size, BitSize.NONE)
-        if self.bit_size == BitSize.NONE:
-            raise UnsupportedBinaryException(
-                "Unsupported bit size: {}".format(bit_size))
+            "ELFCLASS32": enums.BitSize.X32,
+            "ELFCLASS64": enums.BitSize.X64,
+        }.get(bit_size, enums.BitSize.NONE)
+        if self.bit_size == enums.BitSize.NONE:
+            raise exceptions.UnsupportedBinaryException(
+                "Unsupported bit size: {}".format(bit_size)
+            )
 
         return True
 
@@ -59,7 +62,8 @@ class ElfPatcher(BasePatcher):
         eh_frame_segment = self._find_segment_hold_section(eh_frame_section)
         if not eh_frame_segment:
             log.warning(
-                "Can't find which segment hold .eh_frame section, skip add .eh_frame section to code cave")
+                "Can't find which segment hold .eh_frame section, skip add .eh_frame section to code cave"
+            )
             return True
         if not eh_frame_segment.header.p_flags & constants.P_FLAGS.PF_X:
             log.success("Modify .eh_frame section prot +x")
@@ -68,8 +72,9 @@ class ElfPatcher(BasePatcher):
             self._replace_phdr_by_idx(eh_frame_segment, segment_idx)
             self._reload()
 
-        self.add_range_to_code_cave(eh_frame_section['sh_addr'],
-                                    eh_frame_section['sh_size'])
+        self.add_range_to_code_cave(
+            eh_frame_section["sh_addr"], eh_frame_section["sh_size"]
+        )
         log.info("Add .eh_frame to code cave")
         return True
 
@@ -89,7 +94,7 @@ class ElfPatcher(BasePatcher):
     def image_base(self) -> int:
         min_addr = (1 << 64) - 1
         for segment in self._elffile.iter_segments():
-            if segment.header.p_type == 'PT_LOAD':
+            if segment.header.p_type == "PT_LOAD":
                 min_addr = min(min_addr, segment.header.p_vaddr)
         return min_addr
 
@@ -113,8 +118,7 @@ class ElfPatcher(BasePatcher):
 
     def _replace_phdr_by_idx(self, segment: Segment, idx: int) -> bool:
         if idx > self._phnum:
-            log.warning(
-                "segment index out of range: {} > {}".format(idx, self._phnum))
+            log.warning("segment index out of range: {} > {}".format(idx, self._phnum))
             return False
 
         phdr_file_offset = self._phoff + self._phentsize * idx
@@ -126,8 +130,7 @@ class ElfPatcher(BasePatcher):
     def _can_add_segment(self) -> bool:
         return True
 
-    def _add_segment(self, addr: int = 0, length: int = 0x1000,
-                     prot: int = 7) -> int:
+    def _add_segment(self, addr: int = 0, length: int = 0x1000, prot: int = 7) -> int:
         if not self._phdr_reallocated:
             self._alloc_new_segment_for_phdr()
 
@@ -138,8 +141,9 @@ class ElfPatcher(BasePatcher):
                 return 0
         else:
             new_seg = self._elffile.structs.Elf_Phdr.parse(
-                bytes(self._elffile.structs.Elf_Phdr.sizeof()))
-            new_seg.p_type = 'PT_LOAD'
+                bytes(self._elffile.structs.Elf_Phdr.sizeof())
+            )
+            new_seg.p_type = "PT_LOAD"
             new_seg.p_flags = prot
             new_seg.p_offset = self.align(self.binary_size)
             new_seg.p_vaddr = addr
@@ -155,7 +159,7 @@ class ElfPatcher(BasePatcher):
         for i in range(self._elffile.num_segments()):
             seg = self._elffile.get_segment(i)
             phdr = seg.header
-            if phdr.p_type == 'PT_PHDR':
+            if phdr.p_type == "PT_PHDR":
                 # 修改PHDR的size
                 phdr.p_filesz += self._phentsize
                 phdr.p_memsz += self._phentsize
@@ -170,12 +174,15 @@ class ElfPatcher(BasePatcher):
         self._set_file_bytes(0, new_ehdr)
         self._reload()
 
-        log.success("Add segment @ {}({}) {}{}{}".format(
-            hex(new_seg.p_vaddr), hex(new_seg.p_memsz),
-            "r" if new_seg.flags & constants.P_FLAGS.PF_R else "-",
-            "w" if new_seg.flags & constants.P_FLAGS.PF_W else "-",
-            "x" if new_seg.flags & constants.P_FLAGS.PF_X else "-",
-        ))
+        log.success(
+            "Add segment @ {}({}) {}{}{}".format(
+                hex(new_seg.p_vaddr),
+                hex(new_seg.p_memsz),
+                "r" if new_seg.p_flags & constants.P_FLAGS.PF_R else "-",
+                "w" if new_seg.p_flags & constants.P_FLAGS.PF_W else "-",
+                "x" if new_seg.p_flags & constants.P_FLAGS.PF_X else "-",
+            )
+        )
         return new_seg.p_vaddr
 
     def _auto_next_segment(self, length: int, prot: int):
@@ -183,7 +190,7 @@ class ElfPatcher(BasePatcher):
         next_segment_addr = aligned_file_end
         for i in range(self._elffile.num_segments()):
             seg = self._elffile.get_segment(i)
-            if seg.header.p_type == 'PT_LOAD':
+            if seg.header.p_type == "PT_LOAD":
                 seg_start = seg.header.p_vaddr - self.image_base
                 seg_end = self.align(seg_start + seg.header.p_memsz)
                 if seg_start > aligned_file_end:
@@ -191,8 +198,9 @@ class ElfPatcher(BasePatcher):
                 next_segment_addr = max(next_segment_addr, seg_end)
 
         res_seg = self._elffile.structs.Elf_Phdr.parse(
-            bytes(self._elffile.structs.Elf_Phdr.sizeof()))
-        res_seg.p_type = 'PT_LOAD'
+            bytes(self._elffile.structs.Elf_Phdr.sizeof())
+        )
+        res_seg.p_type = "PT_LOAD"
         res_seg.p_flags = prot
         res_seg.p_offset = next_segment_addr
         res_seg.p_vaddr = next_segment_addr + self.image_base
@@ -204,13 +212,12 @@ class ElfPatcher(BasePatcher):
 
     def _alloc_new_segment_for_phdr(self) -> int:
         new_seg_for_phdr = self._auto_next_segment(0x1000, 5)
-        self._set_file_bytes(new_seg_for_phdr.p_paddr,
-                             bytes(new_seg_for_phdr.p_filesz))
+        self._set_file_bytes(new_seg_for_phdr.p_paddr, bytes(new_seg_for_phdr.p_filesz))
         pht_data = bytearray()
         for i in range(self._elffile.num_segments()):
             seg = self._elffile.get_segment(i)
             phdr = seg.header
-            if phdr.p_type == 'PT_PHDR':
+            if phdr.p_type == "PT_PHDR":
                 # 修改PHDR file_offset 和 size
                 phdr.p_offset = new_seg_for_phdr.p_offset
                 phdr.p_paddr = new_seg_for_phdr.p_paddr
@@ -233,13 +240,17 @@ class ElfPatcher(BasePatcher):
 
     def _segment_from_virtual_address(self, virtual_addr: int) -> Segment:
         for seg in self._elffile.iter_segments():
-            if seg.header.p_type == 'PT_LOAD':
-                if seg.header.p_vaddr <= virtual_addr < seg.header.p_vaddr + seg.header.p_memsz:
+            if seg.header.p_type == "PT_LOAD":
+                if (
+                    seg.header.p_vaddr
+                    <= virtual_addr
+                    < seg.header.p_vaddr + seg.header.p_memsz
+                ):
                     return seg
 
         raise Exception(
-            "Can't found segment from virtual address: 0x{:x}".format(
-                virtual_addr))
+            "Can't found segment from virtual address: 0x{:x}".format(virtual_addr)
+        )
 
     def _reload(self) -> bool:
         """
@@ -249,18 +260,17 @@ class ElfPatcher(BasePatcher):
         self._elffile = ELFFile(io.BytesIO(self.binary_data))
         return True
 
-    def _hook_byte_intel(self, vaddr: int,
-                         byte: str or bytes or bytearray) -> bool:
+    def _hook_byte_intel(self, vaddr: int, byte: Union[str, bytes, bytearray]) -> bool:
         if isinstance(byte, str):
-            byte = byte.encode('latin-1')
+            byte = byte.encode("latin-1")
         if isinstance(byte, bytes):
             byte = bytearray(byte)
-        byte += b'\xc3'  # append ret
+        byte += b"\xc3"  # append ret
         self.add_byte(byte, "user_hook_{}".format(hex(vaddr)))
         return self._hook_intel(vaddr)
 
     def _hook_asm_intel(self, vaddr: int, asm: str) -> bool:
-        asm += ';ret;'  # append ret
+        asm += ";ret;"  # append ret
         addr = self._add_asm(asm)
         if not addr:
             return False
@@ -287,8 +297,8 @@ class ElfPatcher(BasePatcher):
         if not backup2:
             return False
         self._label(backup2, "backup2_{}".format(hex(vaddr)))
-        if self.arch == Arch.I386:
-            detour1_asm = '''
+        if self.arch == enums.Arch.I386:
+            detour1_asm = """
     pushad
     call get_pc
     pc: mov esi,edi
@@ -303,9 +313,9 @@ class ElfPatcher(BasePatcher):
 get_pc:
     mov edi, [esp]
     ret
-'''.format(vaddr, hex(vaddr), backup_length, hex(vaddr), origin1_jmp_addr)
+""".format(vaddr, hex(vaddr), backup_length, hex(vaddr), origin1_jmp_addr)
 
-            detour2_asm = '''
+            detour2_asm = """
     pushf
     pushad
     call get_pc
@@ -321,9 +331,9 @@ get_pc:
 get_pc:
     mov edi, [esp]
     ret
-'''.format(vaddr, hex(vaddr), backup_length, origin2_jmp_addr)
-        elif self.arch == Arch.AMD64:
-            detour1_asm = '''
+""".format(vaddr, hex(vaddr), backup_length, origin2_jmp_addr)
+        elif self.arch == enums.Arch.AMD64:
+            detour1_asm = """
     push rdi /* backup reg */
     push rsi
     push rcx
@@ -337,9 +347,9 @@ get_pc:
     pop rdi
     call {{user_hook_{}}} /* hook_func */
     jmp {} /* origin1 */
-'''.format(vaddr, hex(vaddr), backup_length, hex(vaddr), origin1_jmp_addr)
+""".format(vaddr, hex(vaddr), backup_length, hex(vaddr), origin1_jmp_addr)
 
-            detour2_asm = '''
+            detour2_asm = """
     pushf
     push rdi /* backup reg */
     push rsi
@@ -354,7 +364,7 @@ get_pc:
     pop rdi
     popf
     jmp {} /* origin2 */
-'''.format(vaddr, hex(vaddr), backup_length, origin2_jmp_addr)
+""".format(vaddr, hex(vaddr), backup_length, origin2_jmp_addr)
         else:
             # should not be here
             return False
@@ -368,14 +378,14 @@ get_pc:
             return False
         self._label(detour2, "detour2_{}".format(hex(vaddr)))
         origin1_jmp, inst_cnt = self._asm(
-            "jmp {{detour1_{}}}".format(hex(vaddr)), origin1_jmp_addr)
+            "jmp {{detour1_{}}}".format(hex(vaddr)), origin1_jmp_addr
+        )
         origin2_jmp, inst_cnt = self._asm(
-            "jmp {{detour2_{}}}".format(hex(vaddr)), origin2_jmp_addr)
-        backup1_bytes = bytearray(
-            self._get_byte(vaddr, backup_length))
-        backup1_bytes[:len(origin1_jmp)] = origin1_jmp
-        backup2_bytes = bytearray(
-            self._get_byte(vaddr, backup_length))
+            "jmp {{detour2_{}}}".format(hex(vaddr)), origin2_jmp_addr
+        )
+        backup1_bytes = bytearray(self._get_byte(vaddr, backup_length))
+        backup1_bytes[: len(origin1_jmp)] = origin1_jmp
+        backup2_bytes = bytearray(self._get_byte(vaddr, backup_length))
         backup2_bytes[origin1_jmp_length:] = origin2_jmp
         self._patch_byte(backup1, backup1_bytes)
         self._patch_byte(backup2, backup2_bytes)
@@ -392,23 +402,20 @@ get_pc:
     def rva_to_offset(self, rva: int) -> int:
         for segment in self._elffile.iter_segments():
             # 检查虚拟地址是否在该段的范围内
-            if segment['p_vaddr'] <= rva < segment['p_vaddr'] + segment[
-                'p_memsz']:
+            if segment["p_vaddr"] <= rva < segment["p_vaddr"] + segment["p_memsz"]:
                 # 计算偏移量并返回
-                return rva - segment['p_vaddr'] + segment['p_offset']
+                return rva - segment["p_vaddr"] + segment["p_offset"]
 
         # 如果没有找到对应的段，可能是节中的地址
         for section in self._elffile.iter_sections():
             # 检查虚拟地址是否在该节的范围内
-            if section['sh_addr'] <= rva < section['sh_addr'] + section[
-                'sh_size']:
+            if section["sh_addr"] <= rva < section["sh_addr"] + section["sh_size"]:
                 # 计算偏移量并返回
-                return rva - section['sh_addr'] + section['sh_offset']
+                return rva - section["sh_addr"] + section["sh_offset"]
 
-        raise PatchException("no such virtual address: 0x{:x}".format(rva))
+        raise exceptions.PatchException("no such virtual address: 0x{:x}".format(rva))
 
-    def add_segment(self, addr: int = 0, length: int = 0x1000,
-                    prot: int = 7) -> int:
+    def add_segment(self, addr: int = 0, length: int = 0x1000, prot: int = 7) -> int:
         """
         新增一个段
         :param addr: 虚拟地址，默认为0表示自动计算
@@ -416,7 +423,7 @@ get_pc:
         :param prot: 保护权限，默认rwx
         :return: 成功则返回申请的地址，失败返回0
         """
-        if addr & 0xfff:
+        if addr & 0xFFF:
             log.fail("address 0x{:x} is not page aligned".format(addr))
             return 0
         return self._add_segment(addr, length, prot)
@@ -430,9 +437,13 @@ get_pc:
 
         for i in range(self._elffile.num_segments()):
             seg = self._elffile.get_segment(i)
-            if seg.header.p_type == 'PT_GNU_STACK':
+            if seg.header.p_type == "PT_GNU_STACK":
                 if enabled:
-                    seg.header.p_flags = constants.P_FLAGS.PF_R | constants.P_FLAGS.PF_W | constants.P_FLAGS.PF_X
+                    seg.header.p_flags = (
+                        constants.P_FLAGS.PF_R
+                        | constants.P_FLAGS.PF_W
+                        | constants.P_FLAGS.PF_X
+                    )
                 else:
                     seg.header.p_flags = constants.P_FLAGS.PF_R | constants.P_FLAGS.PF_W
 
@@ -441,8 +452,9 @@ get_pc:
                     log.fail("Modify stack phdr failed")
                     return False
 
-                log.success("Set execstack -> {}".format(
-                    "enabled" if enabled else "disabled"))
+                log.success(
+                    "Set execstack -> {}".format("enabled" if enabled else "disabled")
+                )
                 return True
 
         log.fail("Can't find GNU_STACK segment")
@@ -456,8 +468,8 @@ get_pc:
 
         for i in range(self._elffile.num_segments()):
             seg = self._elffile.get_segment(i)
-            if seg.header.p_type == 'PT_GNU_RELRO':
-                seg.header.p_type = 'PT_NULL'
+            if seg.header.p_type == "PT_GNU_RELRO":
+                seg.header.p_type = "PT_NULL"
                 if not self._replace_phdr_by_idx(seg, i):
                     log.fail("Modify phdr failed")
                     return False
@@ -467,8 +479,9 @@ get_pc:
         log.fail("Can't find GNU_RELRO segment")
         return False
 
-    def hook_byte(self, vaddr: int, byte: str or bytes or bytearray,
-                  label: str = None) -> bool:
+    def hook_byte(
+        self, vaddr: int, byte: Union[str, bytes, bytearray], label: str = None
+    ) -> bool:
         """
         在指定地址插入bytes作为hook代码
         :param vaddr: 虚拟地址
@@ -476,7 +489,7 @@ get_pc:
         :param label: 此hook的名字，后续在asm中可以以{name}的方式引用这个hook的地址
         :return:
         """
-        if self.arch in [Arch.I386, Arch.AMD64]:
+        if self.arch in [enums.Arch.I386, enums.Arch.AMD64]:
             if self._hook_byte_intel(vaddr, byte):
                 self._label(vaddr, label)
                 log.success("Hook @ {}".format(hex(vaddr)))
@@ -485,7 +498,7 @@ get_pc:
                 log.fail("Hook @ {} failed".format(hex(vaddr)))
                 return False
         else:
-            raise TODOException("Only support hook i386 & amd64 for now")
+            raise exceptions.TODOException("Only support hook i386 & amd64 for now")
 
     def hook_asm(self, vaddr: int, asm: str, label: str = None) -> bool:
         """
@@ -495,7 +508,7 @@ get_pc:
         :param label: 此hook的名字，后续在asm中可以以{name}的方式引用这个hook的地址
         :return:
         """
-        if self.arch in [Arch.I386, Arch.AMD64]:
+        if self.arch in [enums.Arch.I386, enums.Arch.AMD64]:
             if self._hook_asm_intel(vaddr, asm):
                 self._label(vaddr, label)
                 log.success("Hook @ {}".format(hex(vaddr)))
@@ -504,4 +517,4 @@ get_pc:
                 log.fail("Hook @ {} failed".format(hex(vaddr)))
                 return False
         else:
-            raise TODOException("Only support hook i386 & amd64 for now")
+            raise exceptions.TODOException("Only support hook i386 & amd64 for now")
