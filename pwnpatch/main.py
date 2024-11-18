@@ -3,7 +3,7 @@ from typing import Union
 from pwnpatch.factory import PatcherFactory
 from pwnpatch import patcher
 
-VERSION = "v1.0.1"
+VERSION = "v1.0.2"
 
 
 def get_patcher(
